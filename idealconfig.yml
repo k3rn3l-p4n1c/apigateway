@@ -1,0 +1,108 @@
+# this config file shows our all current features and the features we hope to develop in future
+
+log_level: debug # todo
+
+digitalOcean: # todo
+  token: xxx # todo
+  floatingIp: 0.0.0.0 # todo
+
+entryPoints:
+  - protocol: http
+    enabled: true # todo
+    addr: 127.0.0.1:8080
+
+  - protocol: https  # todo
+    enabled: true # todo
+    addr: 127.0.0.1:8443
+    tls: # todo
+      certFile: "path/to/file.cert" # todo
+      keyFile: "path/to/file.key" # todo
+
+  - protocol: grpc # todo
+    enabled: true # todo
+    addr: 127.0.0.1:50051
+
+  - protocol: websocket # todo
+    enabled: true # todo
+    addr: 127.0.0.1:9000
+
+frontends:
+  - protocol: http
+    hosts: [127.0.0.1:8080, localhost:8080] # todo
+    headers: ["Content-Type=application/json"]
+    methods: [GET, POST]
+    backend: cafe
+
+  - protocol: http
+    paths: [/api] # todo
+    queries: ["version=1"]
+    backend: grpcservice
+    middleware:
+      - checksecuretoken
+
+  - protocol: http/json # todo
+    hosts: [mywebsite.com] # todo
+    paths: [/mainpage] # todo
+    queries: ["version=1"]
+    plugins:
+      - name: aggrigator
+        backends:
+          - name: votes
+            url: /latest
+          - name: grpcservice
+            method: getitems
+
+backends:
+  - name: cafe
+    url: https://cafebazaar.ir/jobs/
+    protocol: http
+    timeout: 5s # todo
+    cache: 15m
+
+  - name: votes
+    url: https://vote.dc1.local/
+    protocol: http
+    discovery: kuberenetes # todo
+    timeout: 5s # todo
+
+  - name: grpcservice
+    url: tcp://grpcservice.service.datacenter.consul # todo
+    discovery: consul # todo
+    protocol: grpc # todo
+    timeout: 10ms # todo
+    middlewares:
+      - name: cache
+        time: 15m # todo
+        key: [item.id]  # todo
+
+  - name: authentication
+    url: tcp://auth.service.datacenter.consul # todo
+    discovery: mesh # todo
+    protocol: grpc # todo
+    timeout: 10ms # todo
+    cache: 15m # todo
+    cacheKey: [item.id]  # todo
+
+  - name: worker
+    url: amqp://rabbit:5671 # todo
+    discovery: consul # todo
+    protocol: grpc # todo
+
+
+middlewares: # todo
+  checksecuretoken: # todo
+  kafka-logger: # todo
+    host: kafka # todo
+    username: xxxx # todo
+    password: xxxx # todo
+  statsd-logger:
+    host: statsd # todo
+    username: xxxx # todo
+    password: xxxx # todo
+  jwt-auth:
+    secret: xxx # todo
+  auth-service: # todo
+    backend: authentication # todo
+    method: auth # todo
+  cache: # todo
+  tollerate: # todo

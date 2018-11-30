@@ -1,4 +1,4 @@
-package server
+package entrypoint
 
 import (
 	"fmt"
@@ -13,9 +13,12 @@ type Server interface {
 	Close() error
 }
 
-func Factory(config *configuration.Server, sd *servicediscovery.ServiceDiscovery) (Server, error) {
+func Factory(config *configuration.EntryPoint, sd *servicediscovery.ServiceDiscovery) (Server, error) {
 	switch config.Protocol {
 	case "http":
+		if !config.Enabled {
+			return nil, errors.New(fmt.Sprintf("%s server is not enabled in config", config.Protocol))
+		}
 		return &Http{
 			config:    config,
 			discovery: sd,

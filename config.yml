@@ -1,14 +1,15 @@
-servers:
+frontend:
   - protocol: http
     enabled: true
     addr: 127.0.0.1:8000
 
-endpoints:
+entryPoints:
   - protocol: http
     host: 127.0.0.1:8000
     to: google
 
-services:
+backend:
   - name: google
+    discovery-type: static
     url: https://cafebazaar.ir/jobs/
     protocol: http

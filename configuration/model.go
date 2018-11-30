@@ -1,26 +1,27 @@
 package configuration
 
 type Config struct {
-	Servers   []*Server
-	Endpoints []*Endpoint
-	Services  []*Service
+	EntryPoint []*EntryPoint
+	Frontend   []*Frontend
+	Backend    []*Backend
 }
 
-type Server struct {
+type EntryPoint struct {
 	Protocol string
 	Enabled  bool
 	Addr     string
 }
 
-type Endpoint struct {
+type Frontend struct {
 	Protocol  string
 	Host      string
 	To        string
-	ToService *Service
+	ToBackend *Backend
 }
 
-type Service struct {
-	Name     string
-	Protocol string
-	Url      string
+type Backend struct {
+	Name          string
+	Protocol      string
+	Url           string
+	DiscoveryType string
 }

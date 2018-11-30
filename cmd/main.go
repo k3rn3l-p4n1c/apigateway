@@ -2,8 +2,8 @@ package main
 
 import (
 	"fmt"
-	"github.com/k3rn3l-p4n1c/goaway/ctl/cmd"
 	"os"
+	"github.com/k3rn3l-p4n1c/apigateway/cmd/cmd"
 )
 
 func main() {

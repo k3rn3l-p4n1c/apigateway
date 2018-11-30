@@ -12,7 +12,7 @@ func noArgs(_ *cobra.Command, args []string) error {
 		return nil
 	}
 	return fmt.Errorf(
-		"goaway: '%s' is not a goaway command.\nSee 'goaway --help'", args[0])
+		"apigateway: '%s' is not a apigateway command.\nSee 'apigateway --help'", args[0])
 }
 
 var RootCmd = &cobra.Command{

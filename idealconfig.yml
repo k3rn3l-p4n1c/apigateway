@@ -8,22 +8,22 @@ digitalOcean: # todo
 
 entryPoints:
   - protocol: http
-    enabled: true # todo
+    enabled: true
     addr: 127.0.0.1:8080
 
   - protocol: https  # todo
-    enabled: true # todo
+    enabled: true
     addr: 127.0.0.1:8443
     tls: # todo
       certFile: "path/to/file.cert" # todo
       keyFile: "path/to/file.key" # todo
 
   - protocol: grpc # todo
-    enabled: true # todo
+    enabled: true
     addr: 127.0.0.1:50051
 
   - protocol: websocket # todo
-    enabled: true # todo
+    enabled: true
     addr: 127.0.0.1:9000
 
 frontends:

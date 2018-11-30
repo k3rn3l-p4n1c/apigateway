@@ -10,14 +10,14 @@ type ServiceDiscovery struct {
 	config *configuration.Config
 }
 
-func MatchConditions(request *http.Request, endpoint *configuration.Endpoint) bool {
-	return endpoint.Host == request.Host
+func MatchConditions(request *http.Request, frontend *configuration.Frontend) bool {
+	return frontend.Host == request.Host
 }
 
-func (sd *ServiceDiscovery) GetService(request *http.Request) (*configuration.Service, error) {
-	for _, endpoint := range sd.config.Endpoints {
-		if MatchConditions(request, endpoint) {
-			return endpoint.ToService, nil
+func (sd *ServiceDiscovery) GetBackend(request *http.Request) (*configuration.Backend, error) {
+	for _, frontend := range sd.config.Frontend {
+		if MatchConditions(request, frontend) {
+			return frontend.ToBackend, nil
 		}
 	}
 	return nil, errors.New("not found")

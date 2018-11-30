@@ -1,4 +1,4 @@
-package server
+package entrypoint
 
 import (
 	"net/http/httputil"
@@ -8,20 +8,20 @@ import (
 )
 
 func (h *Http) getReverseProxy(r *http.Request) (*httputil.ReverseProxy, error) {
-	service, err := h.discovery.GetService(r)
+	backend, err := h.discovery.GetBackend(r)
 	if err != nil {
 		return nil, err
 	}
-	if proxy, ok := h.proxies[service.Url]; ok {
+	if proxy, ok := h.proxies[backend.Url]; ok {
 		return proxy, nil
 	} else {
-		logrus.Debugf("setting up reverse proxy to service %s", service.Name)
-		serviceUrl, err := url.Parse(service.Url)
+		logrus.Debugf("setting up reverse proxy to service %s", backend.Name)
+		serviceUrl, err := url.Parse(backend.Url)
 		if err != nil {
 			return nil, err
 		}
 		proxy = httputil.NewSingleHostReverseProxy(serviceUrl)
-		h.proxies[service.Url] = proxy
+		h.proxies[backend.Url] = proxy
 		return proxy, nil
 	}
 }

@@ -1,4 +1,4 @@
-package server
+package entrypoint
 
 import (
 	"fmt"
@@ -10,7 +10,7 @@ import (
 )
 
 type Http struct {
-	config    *configuration.Server
+	config    *configuration.EntryPoint
 	server    *http.Server
 	discovery *servicediscovery.ServiceDiscovery
 	proxies   map[string]*httputil.ReverseProxy
@@ -18,12 +18,12 @@ type Http struct {
 
 func (h *Http) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	logrus.Debugf("called [%s] /%s", r.Method, r.URL.Path[1:])
-	reproxy, err := h.getReverseProxy(r)
+	reProxy, err := h.getReverseProxy(r)
 	if err != nil {
 		logrus.WithError(err).Debugf("failed to get reverse proxy")
 		fmt.Fprintf(w, "Error: %s!", err)
 	} else {
-		reproxy.ServeHTTP(w, r)
+		reProxy.ServeHTTP(w, r)
 	}
 }
 

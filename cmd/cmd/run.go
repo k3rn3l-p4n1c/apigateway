@@ -4,7 +4,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/k3rn3l-p4n1c/apigateway/configuration"
 	"github.com/sirupsen/logrus"
-	"github.com/k3rn3l-p4n1c/apigateway/server"
+	"github.com/k3rn3l-p4n1c/apigateway/entrypoint"
 	"sync"
 	"os"
 	"os/signal"
@@ -27,10 +27,14 @@ func Run(cmd *cobra.Command, args []string) {
 	serviceDiscovery, err := servicediscovery.NewServiceDiscovery(config)
 
 	var forServers sync.WaitGroup
-	var servers []server.Server
-	for _, serverConfig := range config.Servers {
+	var servers []entrypoint.Server
+	for _, entryPointConfig := range config.EntryPoint {
+		if !entryPointConfig.Enabled {
+			continue
+		}
+
 		forServers.Add(1)
-		apiGatewayServer, err := server.Factory(serverConfig, serviceDiscovery)
+		apiGatewayServer, err := entrypoint.Factory(entryPointConfig, serviceDiscovery)
 		servers = append(servers, apiGatewayServer)
 
 		if err != nil {

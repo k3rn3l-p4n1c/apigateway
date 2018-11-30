@@ -32,17 +32,16 @@ func Load() (*Config, error) {
 		return nil, err
 	}
 
-	name2service := make(map[string]*Service)
-	for _, service := range config.Services {
-		name2service[service.Name] = service
+	name2service := make(map[string]*Backend)
+	for _, backend := range config.Backend {
+		name2service[backend.Name] = backend
 	}
-	for _, endpoint := range config.Endpoints {
-		endpoint.ToService = name2service[endpoint.To]
+	for _, frontend := range config.Frontend {
+		frontend.ToBackend = name2service[frontend.To]
 	}
 
 	return &config, nil
 }
-
 
 // SetDebugLogLevel sets log level to debug mode
 func SetDebugLogLevel(isDebug bool) {

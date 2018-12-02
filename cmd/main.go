@@ -1,9 +1,14 @@
 package main
 
-import "github.com/k3rn3l-p4n1c/apigateway/engine"
+import (
+	"fmt"
+	"os"
+	"github.com/k3rn3l-p4n1c/apigateway/cmd/cmd"
+)
 
 func main() {
-	e := engine.Engine{}
-	e.Start()
-
+	if err := cmd.RootCmd.Execute(); err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
 }

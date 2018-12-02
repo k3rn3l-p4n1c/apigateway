@@ -2,14 +2,7 @@ package cmd
 
 import (
 	"github.com/spf13/cobra"
-	"github.com/k3rn3l-p4n1c/apigateway/configuration"
-	"github.com/sirupsen/logrus"
-	"github.com/k3rn3l-p4n1c/apigateway/entrypoint"
-	"sync"
-	"os"
-	"os/signal"
-	"syscall"
-	"github.com/k3rn3l-p4n1c/apigateway/servicediscovery"
+	"github.com/k3rn3l-p4n1c/apigateway/engine"
 )
 
 var runCmd = &cobra.Command{
@@ -19,56 +12,8 @@ var runCmd = &cobra.Command{
 }
 
 func Run(cmd *cobra.Command, args []string) {
-	config, err := configuration.Load()
-	if err != nil {
-		logrus.WithError(err).Fatal("unable to load configurations.")
-	}
-
-	serviceDiscovery, err := servicediscovery.NewServiceDiscovery(config)
-
-	var forServers sync.WaitGroup
-	var servers []entrypoint.Server
-	for _, entryPointConfig := range config.EntryPoint {
-		if !entryPointConfig.Enabled {
-			continue
-		}
-
-		forServers.Add(1)
-		apiGatewayServer, err := entrypoint.Factory(entryPointConfig, serviceDiscovery)
-		servers = append(servers, apiGatewayServer)
-
-		if err != nil {
-			logrus.WithError(err).Fatal("unable to create server.")
-		}
-
-		go func() {
-			defer apiGatewayServer.Close()
-			err = apiGatewayServer.Start()
-			logrus.WithError(err).Info("server is shutting down.")
-			forServers.Done()
-		}()
-	}
-
-	interrupt := make(chan os.Signal, 1)
-	finished := make(chan struct{}, 1)
-
-	signal.Notify(interrupt, os.Interrupt, os.Kill, syscall.SIGTERM)
-	go func() {
-		forServers.Wait()
-		finished <- struct{}{}
-	}()
-
-	select {
-	case killSignal := <-interrupt:
-		logrus.Info("got signal:", killSignal)
-
-		for _, apiGatewayServer := range servers {
-			apiGatewayServer.Close()
-		}
-	case <-finished:
-		logrus.Info("server stops working")
-	}
-
+	e := engine.Engine{}
+	e.Start()
 }
 
 func init() {

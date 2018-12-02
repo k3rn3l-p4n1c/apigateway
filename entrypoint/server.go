@@ -3,9 +3,8 @@ package entrypoint
 import (
 	"fmt"
 	"errors"
-	"github.com/k3rn3l-p4n1c/apigateway/configuration"
-	"github.com/k3rn3l-p4n1c/apigateway/servicediscovery"
 	"net/http/httputil"
+	"github.com/k3rn3l-p4n1c/apigateway"
 )
 
 type Server interface {
@@ -13,16 +12,16 @@ type Server interface {
 	Close() error
 }
 
-func Factory(config *configuration.EntryPoint, sd *servicediscovery.ServiceDiscovery) (Server, error) {
+func Factory(config *apigateway.EntryPoint, handle apigateway.HandleFunc) (Server, error) {
 	switch config.Protocol {
 	case "http":
-		if !config.Enabled {
+		if !*config.Enabled {
 			return nil, errors.New(fmt.Sprintf("%s server is not enabled in config", config.Protocol))
 		}
 		return &Http{
-			config:    config,
-			discovery: sd,
-			proxies:   make(map[string]*httputil.ReverseProxy),
+			config:  config,
+			handle:  handle,
+			proxies: make(map[string]*httputil.ReverseProxy),
 		}, nil
 
 	default:

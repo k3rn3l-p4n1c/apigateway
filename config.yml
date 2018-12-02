@@ -2,11 +2,11 @@ frontend:
   - protocol: http
     enabled: true
     addr: 127.0.0.1:8000
+    destination: google
 
 entryPoints:
   - protocol: http
-    host: 127.0.0.1:8000
-    to: google
+    addr: 127.0.0.1:8000
 
 backend:
   - name: google

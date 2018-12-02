@@ -20,7 +20,7 @@ dependencies:
 	dep ensure
 
 build: *.go */*.go */*/*.go Gopkg.lock
-	$(GO_VARS) $(GO) run writeversion.go
+	$(GO_VARS) $(GO) run scripts/writeversion.go
 	$(GO_VARS) $(GO) build -i -o="apigateway" -ldflags="$(LD_FLAGS)" $(ROOT)/cmd
 
 test: *.go */*.go */*/*.go

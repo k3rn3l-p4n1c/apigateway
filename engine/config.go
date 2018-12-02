@@ -1,10 +1,11 @@
-package configuration
+package engine
 
 import (
 	"github.com/fsnotify/fsnotify"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 	"errors"
+	"github.com/k3rn3l-p4n1c/apigateway"
 )
 
 var (
@@ -12,7 +13,7 @@ var (
 )
 
 
-func Load() (*Config, error) {
+func Load() (*apigateway.Config, error) {
 	v := viper.New()
 
 	v.SetConfigFile(configFilePath)
@@ -24,20 +25,14 @@ func Load() (*Config, error) {
 	if err != nil {
 		return nil, errors.New("can't read v file")
 	}
+	v.SetDefault("entryPoints.enabled", true)
 	SetDebugLogLevel(true)
-	var config = Config{}
+	logrus.Debug(v.AllSettings())
+	var config = apigateway.Config{}
 
 	err = v.Unmarshal(&config)
 	if err != nil {
 		return nil, err
-	}
-
-	name2service := make(map[string]*Backend)
-	for _, backend := range config.Backend {
-		name2service[backend.Name] = backend
-	}
-	for _, frontend := range config.Frontend {
-		frontend.ToBackend = name2service[frontend.To]
 	}
 
 	return &config, nil

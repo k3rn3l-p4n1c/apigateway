@@ -1,30 +1,54 @@
 package entrypoint
 
 import (
-	"fmt"
 	"github.com/sirupsen/logrus"
 	"net/http"
-	"github.com/k3rn3l-p4n1c/apigateway/configuration"
-	"github.com/k3rn3l-p4n1c/apigateway/servicediscovery"
 	"net/http/httputil"
+	"github.com/k3rn3l-p4n1c/apigateway"
+	"net"
+	"context"
+	"time"
 )
 
 type Http struct {
-	config    *configuration.EntryPoint
+	config    *apigateway.EntryPoint
 	server    *http.Server
-	discovery *servicediscovery.ServiceDiscovery
 	proxies   map[string]*httputil.ReverseProxy
+	handle   apigateway.HandleFunc
 }
 
 func (h *Http) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	logrus.Debugf("called [%s] /%s", r.Method, r.URL.Path[1:])
-	reProxy, err := h.getReverseProxy(r)
+	requestRequest, err := FromHttp(r, w)
 	if err != nil {
-		logrus.WithError(err).Debugf("failed to get reverse proxy")
-		fmt.Fprintf(w, "Error: %s!", err)
-	} else {
-		reProxy.ServeHTTP(w, r)
+		badRequest(w)
+		return
 	}
+	h.handle(requestRequest)
+}
+
+func FromHttp(r *http.Request, w http.ResponseWriter) (apigateway.Request, error) {
+	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
+	obj := apigateway.Request{
+		Protocol:    "http",
+		Context:     ctx,
+		CtxCancel:   cancel,
+		ClientIP:    r.RemoteAddr,
+		HttpHeaders: r.Header,
+		HttpMethod:  r.Method,
+		URL:         "http://"+r.Host + r.RequestURI,
+		Body:        r.Body,
+
+		HttpResponseWriter: w,
+	}
+	if clientIP, _, err := net.SplitHostPort(r.RemoteAddr); err == nil {
+		obj.ClientIP = clientIP
+	}
+	return obj, nil
+}
+
+func badRequest(w http.ResponseWriter) {
+	w.Write([]byte("bad request"))
 }
 
 func (h *Http) Start() error {

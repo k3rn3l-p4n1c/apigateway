@@ -37,7 +37,7 @@ frontends:
     paths: [/api] # todo
     queries: ["version=1"]
     backend: grpcservice
-    middleware:
+    middlewares:
       - checksecuretoken
 
   - protocol: http/json # todo

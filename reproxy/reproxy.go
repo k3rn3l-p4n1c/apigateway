@@ -1,7 +1,6 @@
 package reproxy
 
 import (
-	"github.com/k3rn3l-p4n1c/apigateway/servicediscovery"
 	"github.com/k3rn3l-p4n1c/apigateway"
 	"github.com/sirupsen/logrus"
 )
@@ -11,13 +10,11 @@ type Interface interface {
 }
 
 type MuxReverseProxy struct {
-	//config           *engine.Config
 	httpReverseProxy *HttpReverseProxy
 }
 
-func NewReverseProxy(discovery *servicediscovery.ServiceDiscovery) (Interface, error) {
+func NewReverseProxy(discovery *ServiceDiscovery) (Interface, error) {
 	return &MuxReverseProxy{
-		//config: config,
 		httpReverseProxy: NewHttpReverseProxy(discovery),
 	}, nil
 }

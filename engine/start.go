@@ -1,15 +1,14 @@
 package engine
 
 import (
-	"github.com/sirupsen/logrus"
-	"sync"
+	"github.com/k3rn3l-p4n1c/apigateway"
 	"github.com/k3rn3l-p4n1c/apigateway/entrypoint"
+	"github.com/k3rn3l-p4n1c/apigateway/reproxy"
+	"github.com/sirupsen/logrus"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
-	"github.com/k3rn3l-p4n1c/apigateway/reproxy"
-	"github.com/k3rn3l-p4n1c/apigateway/servicediscovery"
-	"github.com/k3rn3l-p4n1c/apigateway"
 )
 
 type Engine struct {
@@ -17,7 +16,6 @@ type Engine struct {
 	config       *apigateway.Config
 	reverseProxy reproxy.Interface
 }
-
 
 func (e *Engine) Start() {
 	c, err := Load()
@@ -38,7 +36,7 @@ func (e *Engine) Start() {
 		}
 	}
 
-	sd := servicediscovery.NewServiceDiscovery(c)
+	sd := reproxy.NewServiceDiscovery(c)
 	e.reverseProxy, _ = reproxy.NewReverseProxy(sd)
 
 	e.requestCh = make(chan apigateway.Request, 100)

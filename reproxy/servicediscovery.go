@@ -1,10 +1,10 @@
-package servicediscovery
+package reproxy
 
 import (
-	"net/url"
 	"errors"
 	"fmt"
 	"github.com/k3rn3l-p4n1c/apigateway"
+	"net/url"
 )
 
 type ServiceDiscovery struct {

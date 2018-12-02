@@ -1,10 +1,10 @@
 package entrypoint
 
 import (
-	"fmt"
 	"errors"
-	"net/http/httputil"
+	"fmt"
 	"github.com/k3rn3l-p4n1c/apigateway"
+	"net/http/httputil"
 )
 
 type Server interface {

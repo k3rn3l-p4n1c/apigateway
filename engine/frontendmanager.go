@@ -3,8 +3,8 @@ package engine
 import (
 	"errors"
 	"github.com/k3rn3l-p4n1c/apigateway"
-	"net/url"
 	"github.com/sirupsen/logrus"
+	"net/url"
 )
 
 func (e Engine) findFrontend(r apigateway.Request) (*apigateway.Frontend, error) {
@@ -34,4 +34,3 @@ func isMatch(frontend *apigateway.Frontend, r apigateway.Request) bool {
 	}
 	return false
 }
-

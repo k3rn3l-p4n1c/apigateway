@@ -1,9 +1,9 @@
 package apigateway
 
 import (
-	"net/http"
 	"context"
 	"io"
+	"net/http"
 )
 
 type Config struct {

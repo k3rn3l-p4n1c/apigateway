@@ -1,16 +1,15 @@
 package reproxy
 
 import (
-	"net/http"
-	"strings"
 	"context"
+	"github.com/k3rn3l-p4n1c/apigateway"
 	"github.com/sirupsen/logrus"
 	"io"
-	"github.com/k3rn3l-p4n1c/apigateway/servicediscovery"
-	"time"
-	"sync"
+	"net/http"
 	"net/http/httputil"
-	"github.com/k3rn3l-p4n1c/apigateway"
+	"strings"
+	"sync"
+	"time"
 )
 
 // Hop-by-hop headers. These are removed when sent to the backend.
@@ -28,12 +27,12 @@ var hopHeaders = []string{
 }
 
 type HttpReverseProxy struct {
-	serviceDiscovery *servicediscovery.ServiceDiscovery
+	serviceDiscovery *ServiceDiscovery
 	FlushInterval    time.Duration
 	BufferPool       httputil.BufferPool
 }
 
-func NewHttpReverseProxy(serviceDiscovery *servicediscovery.ServiceDiscovery) *HttpReverseProxy {
+func NewHttpReverseProxy(serviceDiscovery *ServiceDiscovery) *HttpReverseProxy {
 	return &HttpReverseProxy{
 		serviceDiscovery: serviceDiscovery,
 	}

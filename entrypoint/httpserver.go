@@ -1,20 +1,20 @@
 package entrypoint
 
 import (
+	"context"
+	"github.com/k3rn3l-p4n1c/apigateway"
 	"github.com/sirupsen/logrus"
+	"net"
 	"net/http"
 	"net/http/httputil"
-	"github.com/k3rn3l-p4n1c/apigateway"
-	"net"
-	"context"
 	"time"
 )
 
 type Http struct {
-	config    *apigateway.EntryPoint
-	server    *http.Server
-	proxies   map[string]*httputil.ReverseProxy
-	handle   apigateway.HandleFunc
+	config  *apigateway.EntryPoint
+	server  *http.Server
+	proxies map[string]*httputil.ReverseProxy
+	handle  apigateway.HandleFunc
 }
 
 func (h *Http) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -36,7 +36,7 @@ func FromHttp(r *http.Request, w http.ResponseWriter) (apigateway.Request, error
 		ClientIP:    r.RemoteAddr,
 		HttpHeaders: r.Header,
 		HttpMethod:  r.Method,
-		URL:         "http://"+r.Host + r.RequestURI,
+		URL:         "http://" + r.Host + r.RequestURI,
 		Body:        r.Body,
 
 		HttpResponseWriter: w,

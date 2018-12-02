@@ -1,17 +1,16 @@
 package engine
 
 import (
+	"errors"
 	"github.com/fsnotify/fsnotify"
+	"github.com/k3rn3l-p4n1c/apigateway"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
-	"errors"
-	"github.com/k3rn3l-p4n1c/apigateway"
 )
 
 var (
 	configFilePath = "./config.yml"
 )
-
 
 func Load() (*apigateway.Config, error) {
 	v := viper.New()

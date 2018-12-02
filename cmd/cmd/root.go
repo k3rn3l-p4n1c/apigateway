@@ -3,8 +3,8 @@ package cmd
 import (
 	"fmt"
 
-	"github.com/spf13/cobra"
 	"github.com/k3rn3l-p4n1c/apigateway/version"
+	"github.com/spf13/cobra"
 )
 
 func noArgs(_ *cobra.Command, args []string) error {

@@ -1,8 +1,8 @@
 package cmd
 
 import (
-	"github.com/spf13/cobra"
 	"github.com/k3rn3l-p4n1c/apigateway/engine"
+	"github.com/spf13/cobra"
 )
 
 var runCmd = &cobra.Command{

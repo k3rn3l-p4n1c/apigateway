@@ -1,6 +1,6 @@
 # this config file shows our all current features and the features we hope to develop in future
 
-log_level: debug # todo
+log_level: debug
 
 digitalOcean: # todo
   token: xxx # todo

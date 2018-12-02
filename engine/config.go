@@ -25,8 +25,8 @@ func Load() (*apigateway.Config, error) {
 	if err != nil {
 		return nil, errors.New("can't read v file")
 	}
-	v.SetDefault("entryPoints.enabled", true)
-	SetDebugLogLevel(true)
+	v.SetDefault("log_level", "debug")
+	setLogLevel(v.GetString("log_level"))
 	logrus.Debug(v.AllSettings())
 	var config = apigateway.Config{}
 
@@ -39,12 +39,20 @@ func Load() (*apigateway.Config, error) {
 }
 
 // SetDebugLogLevel sets log level to debug mode
-func SetDebugLogLevel(isDebug bool) {
-	if isDebug {
+func setLogLevel(logLevel string) {
+	switch logLevel {
+	case "debug":
 		logrus.SetLevel(logrus.DebugLevel)
-		logrus.Debug("log level is set to Debug")
-	} else {
+	case "info":
 		logrus.SetLevel(logrus.InfoLevel)
+	case "warn":
+		logrus.SetLevel(logrus.WarnLevel)
+	case "error":
+		logrus.SetLevel(logrus.ErrorLevel)
+	case "fatal":
+		logrus.SetLevel(logrus.FatalLevel)
+	default:
+		logrus.WithField("log_level", logLevel).Fatal("invalid value for field log_level")
 	}
 }
 

@@ -4,12 +4,14 @@ import (
 	"context"
 	"github.com/k3rn3l-p4n1c/apigateway"
 	"github.com/sirupsen/logrus"
-	"io"
 	"net/http"
-	"net/http/httputil"
 	"strings"
-	"sync"
+	"bytes"
+	"io/ioutil"
 	"time"
+	"net/http/httputil"
+	"io"
+	"sync"
 )
 
 // Hop-by-hop headers. These are removed when sent to the backend.
@@ -27,40 +29,39 @@ var hopHeaders = []string{
 }
 
 type HttpReverseProxy struct {
-	serviceDiscovery *ServiceDiscovery
+	serviceDiscovery apigateway.ServiceDiscovery
+	backend          *apigateway.Backend
 	FlushInterval    time.Duration
 	BufferPool       httputil.BufferPool
 }
 
-func NewHttpReverseProxy(serviceDiscovery *ServiceDiscovery) *HttpReverseProxy {
+func NewHttpReverseProxy(serviceDiscovery apigateway.ServiceDiscovery, backend *apigateway.Backend) (*HttpReverseProxy, error) {
 	return &HttpReverseProxy{
 		serviceDiscovery: serviceDiscovery,
-	}
+		backend:          backend,
+	}, nil
 }
 
-func (p HttpReverseProxy) Server(Request apigateway.Request, backend *apigateway.Backend) {
+func (p HttpReverseProxy) Handle(request *apigateway.Request) (*apigateway.Response, error) {
 	logrus.Debug("proxying http")
 	transport := http.DefaultTransport
-	ctx := Request.Context
-	if cn, ok := Request.HttpResponseWriter.(http.CloseNotifier); ok {
-		var cancel context.CancelFunc
-		ctx, cancel = context.WithCancel(ctx)
-		defer cancel()
-		notifyChan := cn.CloseNotify()
-		go func() {
-			select {
-			case <-notifyChan:
-				cancel()
-			case <-ctx.Done():
-			}
-		}()
-	}
+	ctx := request.Context
+	var cancel context.CancelFunc
+	ctx, cancel = context.WithCancel(ctx)
+	defer cancel()
+	go func() {
+		select {
+		case <-request.Context.Done():
+			cancel()
+		case <-ctx.Done():
+		}
+	}()
 
-	outReq, _ := http.NewRequest(Request.HttpMethod, Request.URL, Request.Body)
+	outReq, _ := http.NewRequest(request.HttpMethod, request.URL, request.Body)
 	outReq = outReq.WithContext(ctx)
-	outReq.Header = cloneHeader(Request.HttpHeaders)
+	outReq.Header = cloneHeader(request.HttpHeaders)
 
-	err := p.director(backend, outReq)
+	err := p.director(request, outReq)
 	if err != nil {
 		logrus.WithError(err).Error("unable to direct request")
 	}
@@ -81,15 +82,25 @@ func (p HttpReverseProxy) Server(Request apigateway.Request, backend *apigateway
 	// X-Forwarded-For information as a comma+space
 	// separated list and fold multiple headers into one.
 	if prior, ok := outReq.Header["X-Forwarded-For"]; ok {
-		Request.ClientIP = strings.Join(prior, ", ") + ", " + Request.ClientIP
+		request.ClientIP = strings.Join(prior, ", ") + ", " + request.ClientIP
 	}
-	outReq.Header.Set("X-Forwarded-For", Request.ClientIP)
+	outReq.Header.Set("X-Forwarded-For", request.ClientIP)
 
 	res, err := transport.RoundTrip(outReq)
 	if err != nil {
-		logrus.Infof("http: proxy error: %v", err)
-		Request.HttpResponseWriter.WriteHeader(http.StatusBadGateway)
-		return
+		logrus.Infof("http: reproxy error: %v", err)
+		//request.HttpResponseWriter.WriteHeader(http.StatusBadGateway)
+		return &apigateway.Response{
+			Protocol:   "http",
+			Body:       ioutil.NopCloser(bytes.NewBufferString("bad gateway")),
+			HttpStatus: http.StatusBadGateway,
+		}, err
+	}
+
+	finalResp := &apigateway.Response{
+		Protocol:   "http",
+		HttpHeaders: make(http.Header),
+		HttpStatus: http.StatusBadGateway,
 	}
 
 	removeConnectionHeaders(res.Header)
@@ -98,7 +109,8 @@ func (p HttpReverseProxy) Server(Request apigateway.Request, backend *apigateway
 		res.Header.Del(h)
 	}
 
-	copyHeader(Request.HttpResponseWriter.Header(), res.Header)
+	//copyHeader(request.HttpResponseWriter.Header(), res.Header)
+	copyHeader(finalResp.HttpHeaders, res.Header)
 
 	// The "Trailer" header isn't included in the Transport's response,
 	// at least for *http.Transport. Build it up from Trailer.
@@ -108,32 +120,47 @@ func (p HttpReverseProxy) Server(Request apigateway.Request, backend *apigateway
 		for k := range res.Trailer {
 			trailerKeys = append(trailerKeys, k)
 		}
-		Request.HttpResponseWriter.Header().Add("Trailer", strings.Join(trailerKeys, ", "))
+		finalResp.HttpHeaders.Add("Trailer", strings.Join(trailerKeys, ", "))
+		//request.HttpResponseWriter.Header().Add("Trailer", strings.Join(trailerKeys, ", "))
 	}
 
-	Request.HttpResponseWriter.WriteHeader(res.StatusCode)
+	//request.HttpResponseWriter.WriteHeader(res.StatusCode)
+	finalResp.HttpStatus = res.StatusCode
 	if len(res.Trailer) > 0 {
 		// Force chunking if we saw a response trailer.
 		// This prevents net/http from calculating the length for short
 		// bodies and adding a Content-Length.
-		if fl, ok := Request.HttpResponseWriter.(http.Flusher); ok {
-			fl.Flush()
-		}
+		panic("WTF?")
+		//if fl, ok := request.HttpResponseWriter.(http.Flusher); ok {
+		//	fl.Flush()
+		//}
 	}
-	p.copyResponse(Request.HttpResponseWriter, res.Body)
+
+	//p.copyResponse(request.HttpResponseWriter, res.Body)
+
+	body, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		logrus.WithError(err).Debug("Errrrrr")
+	}
+	finalResp.Body = ioutil.NopCloser(bytes.NewBuffer(body))
+
 	res.Body.Close() // close now, instead of defer, to populate res.Trailer
 
 	if len(res.Trailer) == announcedTrailers {
-		copyHeader(Request.HttpResponseWriter.Header(), res.Trailer)
-		return
+		//copyHeader(request.HttpResponseWriter.Header(), res.Trailer)
+		copyHeader(finalResp.HttpHeaders, res.Trailer)
+		return finalResp, nil
+
 	}
 
 	for k, vv := range res.Trailer {
 		k = http.TrailerPrefix + k
 		for _, v := range vv {
-			Request.HttpResponseWriter.Header().Add(k, v)
+			//request.HttpResponseWriter.Header().Add(k, v)
+			finalResp.HttpHeaders.Add(k, v)
 		}
 	}
+	return finalResp, nil
 }
 
 func cloneHeader(h http.Header) http.Header {
@@ -166,8 +193,8 @@ func removeConnectionHeaders(h http.Header) {
 	}
 }
 
-func (p HttpReverseProxy) director(backend *apigateway.Backend, outReq *http.Request) error {
-	scheme, host, path, err := p.serviceDiscovery.Get(backend)
+func (p HttpReverseProxy) director(incomingReq *apigateway.Request, outReq *http.Request) error {
+	scheme, host, path, err := p.serviceDiscovery.Get(incomingReq)
 	if err != nil {
 		return err
 	}

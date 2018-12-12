@@ -1,7 +1,6 @@
 package entrypoint
 
 import (
-	"errors"
 	"fmt"
 	"github.com/k3rn3l-p4n1c/apigateway"
 	"net/http/httputil"
@@ -16,7 +15,7 @@ func Factory(config *apigateway.EntryPoint, handle apigateway.HandleFunc) (Serve
 	switch config.Protocol {
 	case "http":
 		if !*config.Enabled {
-			return nil, errors.New(fmt.Sprintf("%s server is not enabled in config", config.Protocol))
+			return nil, fmt.Errorf("%s server is not enabled in config", config.Protocol)
 		}
 		return &Http{
 			config:  config,
@@ -25,6 +24,6 @@ func Factory(config *apigateway.EntryPoint, handle apigateway.HandleFunc) (Serve
 		}, nil
 
 	default:
-		return nil, errors.New(fmt.Sprintf("protocol %s for frontend is not supported", config.Protocol))
+		return nil, fmt.Errorf("protocol %s for frontend is not supported", config.Protocol)
 	}
 }

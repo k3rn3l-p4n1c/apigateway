@@ -9,12 +9,15 @@ import (
 	"os/signal"
 	"sync"
 	"syscall"
+	"github.com/k3rn3l-p4n1c/apigateway/middlewares"
+	"net/http"
+	"bytes"
+	"io/ioutil"
 )
 
 type Engine struct {
-	requestCh    chan apigateway.Request
-	config       *apigateway.Config
-	reverseProxy reproxy.Interface
+	requestCh chan apigateway.Request
+	config    *apigateway.Config
 }
 
 func (e *Engine) Start() {
@@ -36,8 +39,23 @@ func (e *Engine) Start() {
 		}
 	}
 
-	sd := reproxy.NewServiceDiscovery(c)
-	e.reverseProxy, _ = reproxy.NewReverseProxy(sd)
+	for _, frontend := range c.Frontend {
+		for _, middlewareName := range frontend.MiddlewareNames {
+			middleware := middlewares.Middlewares[middlewareName]
+			if len(frontend.Middlewares) > 0 {
+				frontend.Middlewares[len(frontend.Middlewares)-1].SetNext(middleware)
+			}
+			frontend.Middlewares = append(frontend.Middlewares, middleware)
+		}
+		frontend.Destination.ReverseProxy, err = reproxy.New(frontend.Destination)
+		if err != nil {
+			logrus.WithError(err).Fatal("fail to initialize reverse proxy for backend")
+			return
+		}
+		if len(frontend.Middlewares) > 0 {
+			frontend.Middlewares[len(frontend.Middlewares)-1].SetNext(frontend.Destination.ReverseProxy)
+		}
+	}
 
 	e.requestCh = make(chan apigateway.Request, 100)
 
@@ -93,25 +111,51 @@ func (e *Engine) Start() {
 	}
 }
 
-func (e *Engine) Handle(r apigateway.Request) {
-	//if r.Context.Err() != nil {
-	//	logrus.WithError(r.Context.Err()).Debug("error in context when processing request")
-	//	continue
-	//}
-
-	frontend, err := e.findFrontend(r)
+func (e *Engine) Handle(request *apigateway.Request) (resp *apigateway.Response) {
+	frontend, err := e.findFrontend(request)
 	if err != nil {
 		logrus.WithError(err).Info("error in finding frontend")
-		r.HttpResponseWriter.Write([]byte("error in finding frontend"))
-		return
+		return &apigateway.Response{
+			HttpStatus: http.StatusInternalServerError,
+			Body:       ioutil.NopCloser(bytes.NewBufferString("error in finding frontend")),
+		}
 	}
-	for _, middleware := range frontend.Middlewares {
-		middleware.Process(&r)
-	}
-	if frontend.Destination == nil {
-		r.HttpResponseWriter.Write([]byte("backend is nil"))
-		return
-	}
-	e.reverseProxy.Serve(r, frontend.Destination)
 
+	if frontend.Destination == nil {
+		if err != nil {
+			return &apigateway.Response{
+				HttpStatus: http.StatusInternalServerError,
+				Body:       ioutil.NopCloser(bytes.NewBufferString("backend is nil")),
+			}
+		}
+	}
+
+	if len(frontend.Middlewares) > 0 {
+		resp, err = frontend.Middlewares[0].Handle(request)
+		if err != nil {
+			logrus.WithError(err).Error("error in middleware")
+			return &apigateway.Response{
+				HttpStatus: http.StatusInternalServerError,
+				Body:       ioutil.NopCloser(bytes.NewBufferString("apigateway internal error")),
+			}
+		}
+		if request.Context.Err() != nil {
+			logrus.WithError(request.Context.Err()).Debug("error in context when processing request")
+			return &apigateway.Response{
+				HttpStatus: http.StatusGatewayTimeout,
+				Body:       ioutil.NopCloser(bytes.NewBufferString("timeout exceeded")),
+			}
+		}
+	} else {
+		resp, err = frontend.Destination.ReverseProxy.Handle(request)
+		logrus.Debug("no middleware")
+		if err != nil {
+			logrus.WithError(err).Error("error in reverse proxy")
+			return &apigateway.Response{
+				HttpStatus: http.StatusInternalServerError,
+				Body:       ioutil.NopCloser(bytes.NewBufferString("apigateway internal error")),
+			}
+		}
+	}
+	return
 }

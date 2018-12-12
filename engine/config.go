@@ -1,7 +1,7 @@
 package engine
 
 import (
-	"errors"
+	"fmt"
 	"github.com/fsnotify/fsnotify"
 	"github.com/k3rn3l-p4n1c/apigateway"
 	"github.com/sirupsen/logrus"
@@ -22,7 +22,7 @@ func Load() (*apigateway.Config, error) {
 
 	err := v.ReadInConfig()
 	if err != nil {
-		return nil, errors.New("can't read v file")
+		return nil, fmt.Errorf("can't read v file error=(%v)", err)
 	}
 	v.SetDefault("log_level", "debug")
 	setLogLevel(v.GetString("log_level"))

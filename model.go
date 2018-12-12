@@ -29,14 +29,34 @@ type Frontend struct {
 }
 
 type Backend struct {
-	Name          string
-	Protocol      string
-	Url           string
-	DiscoveryType string `mapstructure:"discovery-type"`
+	Name      string
+	Protocol  string
+	Discovery Discovery
+
+	ReverseProxy ReverseProxy `mapstructure:"-"`
+}
+
+type Discovery struct {
+	Type string
+	Url  string
+}
+
+
+type Handler interface {
+	Handle(request *Request) (*Response, error)
+}
+
+type ServiceDiscovery interface {
+	Get(request *Request) (scheme string, host string, path string, err error)
 }
 
 type Middleware interface {
-	Process(Request *Request) error
+	Handler
+	SetNext(handler Handler)
+}
+
+type ReverseProxy interface {
+	Handler
 }
 
 type Request struct {
@@ -50,7 +70,13 @@ type Request struct {
 	Body               io.ReadCloser
 	HttpHeaders        http.Header
 	HttpMethod         string
-	HttpResponseWriter http.ResponseWriter
 }
 
-type HandleFunc func(request Request)
+type Response struct {
+	Protocol   string
+	Body       io.ReadCloser
+	HttpStatus int
+	HttpHeaders        http.Header
+}
+
+type HandleFunc func(request *Request) *Response

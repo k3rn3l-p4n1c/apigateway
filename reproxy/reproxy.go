@@ -1,30 +1,20 @@
 package reproxy
 
 import (
+	"fmt"
 	"github.com/k3rn3l-p4n1c/apigateway"
-	"github.com/sirupsen/logrus"
+	"github.com/k3rn3l-p4n1c/apigateway/servicediscovery"
 )
 
-type Interface interface {
-	Serve(Request apigateway.Request, backend *apigateway.Backend)
-}
-
-type MuxReverseProxy struct {
-	httpReverseProxy *HttpReverseProxy
-}
-
-func NewReverseProxy(discovery *ServiceDiscovery) (Interface, error) {
-	return &MuxReverseProxy{
-		httpReverseProxy: NewHttpReverseProxy(discovery),
-	}, nil
-}
-
-func (p MuxReverseProxy) Serve(request apigateway.Request, backend *apigateway.Backend) {
-	switch request.Protocol {
+func New(backend *apigateway.Backend) (apigateway.ReverseProxy, error) {
+	discovery, err := servicediscovery.New(backend.Discovery)
+	if err != nil {
+		return nil, fmt.Errorf("fail to initialize new reverse proxy error=(%v)", err)
+	}
+	switch backend.Protocol {
 	case "http":
-		p.httpReverseProxy.Server(request, backend)
+		return NewHttpReverseProxy(discovery, backend)
 	default:
-		logrus.Errorf("invalid protocol %s", request.Protocol)
-		request.HttpResponseWriter.Write([]byte("protocol is wrong"))
+		return nil, fmt.Errorf("invalid protocol %s", backend.Protocol)
 	}
 }

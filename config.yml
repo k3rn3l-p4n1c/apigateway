@@ -5,6 +5,8 @@ frontend:
     enabled: true
     addr: 127.0.0.1:8000
     destination: google
+    middlewares:
+      - auth
 
 entryPoints:
   - protocol: http
@@ -12,6 +14,7 @@ entryPoints:
 
 backend:
   - name: google
-    discovery-type: static
-    url: https://cafebazaar.ir/jobs/
+    discovery:
+      type: static
+      url: https://cafebazaar.ir/jobs/
     protocol: http

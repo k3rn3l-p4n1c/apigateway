@@ -7,27 +7,97 @@ import (
 	"github.com/sirupsen/logrus"
 	"os"
 	"os/signal"
-	"sync"
 	"syscall"
 	"github.com/k3rn3l-p4n1c/apigateway/middlewares"
 	"net/http"
 	"bytes"
 	"io/ioutil"
+	"fmt"
+	"github.com/pkg/errors"
+	"github.com/spf13/viper"
+	"github.com/fsnotify/fsnotify"
 )
 
 type Engine struct {
-	requestCh chan apigateway.Request
-	config    *apigateway.Config
+	viper       *viper.Viper
+	config      *apigateway.Config
+	entryPoints map[string]entrypoint.Server
+	doneSignal  chan struct{}
+}
+
+func NewEngine() (*Engine, error) {
+	engine := &Engine{
+		entryPoints: make(map[string]entrypoint.Server),
+		doneSignal:  make(chan struct{}),
+		viper: viper.New(),
+	}
+
+	engine.viper.SetConfigFile(configFilePath)
+
+	engine.viper.OnConfigChange(engine.onConfigChange)
+	engine.viper.WatchConfig()
+
+	err := engine.viper.ReadInConfig()
+	if err != nil {
+		return nil, fmt.Errorf("can't read v file error=(%v)", err)
+	}
+	engine.viper.SetDefault("log_level", "debug")
+	setLogLevel(engine.viper.GetString("log_level"))
+	logrus.Debug(engine.viper.AllSettings())
+	var config = apigateway.Config{}
+
+	err = engine.viper.Unmarshal(&config)
+	if err != nil {
+		return nil, err
+	}
+
+	err = engine.loadConfig(&config)
+	if err != nil {
+		return nil, err
+	}
+	return engine, nil
+}
+
+func (e *Engine) onConfigChange(_ fsnotify.Event) {
+	logrus.Info("reloading config")
+	var config = apigateway.Config{}
+	err := e.viper.Unmarshal(&config)
+	if err != nil {
+		logrus.WithError(err).Errorf("fail to change config")
+		return
+	}
+
+	err = e.loadConfig(&config)
+	if err != nil {
+		logrus.WithError(err).Errorf("fail to reload config")
+	}
 }
 
 func (e *Engine) Start() {
-	c, err := Load()
-	if err != nil {
-		logrus.WithError(err).Fatal("unable to load configurations.")
-	} else {
-		e.config = c
-	}
+	interrupt := make(chan os.Signal, 1)
+	finished := make(chan struct{}, 1)
 
+	signal.Notify(interrupt, os.Interrupt, os.Kill, syscall.SIGTERM)
+	go func() {
+		for range e.doneSignal {
+		}
+		finished <- struct{}{}
+	}()
+
+	select {
+	case killSignal := <-interrupt:
+		logrus.Info("got signal:", killSignal)
+
+		for protocol, entryPoint := range e.entryPoints {
+			logrus.Info("killing %s", protocol)
+			entryPoint.Close()
+		}
+	case <-finished:
+		logrus.Info("server stops working")
+	}
+}
+
+func (e *Engine) loadConfig(c *apigateway.Config) error {
 	name2service := make(map[string]*apigateway.Backend)
 	for _, backend := range c.Backend {
 		name2service[backend.Name] = backend
@@ -35,7 +105,7 @@ func (e *Engine) Start() {
 	for _, frontend := range c.Frontend {
 		frontend.Destination = name2service[frontend.DestinationName]
 		if frontend.Destination == nil {
-			logrus.Fatalf("no backend for name %s", frontend.DestinationName)
+			return fmt.Errorf("no backend for name %s", frontend.DestinationName)
 		}
 	}
 
@@ -47,68 +117,85 @@ func (e *Engine) Start() {
 			}
 			frontend.Middlewares = append(frontend.Middlewares, middleware)
 		}
+		var err error
 		frontend.Destination.ReverseProxy, err = reproxy.New(frontend.Destination)
 		if err != nil {
-			logrus.WithError(err).Fatal("fail to initialize reverse proxy for backend")
-			return
+			return fmt.Errorf("fail to initialize reverse proxy for backend error=%v", err)
 		}
 		if len(frontend.Middlewares) > 0 {
 			frontend.Middlewares[len(frontend.Middlewares)-1].SetNext(frontend.Destination.ReverseProxy)
 		}
 	}
 
-	e.requestCh = make(chan apigateway.Request, 100)
-
-	var forServers sync.WaitGroup
-	var servers []entrypoint.Server
-	if len(e.config.EntryPoints) == 0 {
-		logrus.Fatal("no entrypoint is set")
+	if len(c.EntryPoints) == 0 {
+		return errors.New("no entrypoint is set")
 	}
-	for _, entryPointConfig := range e.config.EntryPoints {
-		true := true
-		if entryPointConfig.Enabled == nil {
-			entryPointConfig.Enabled = &true
-		}
-		if !*entryPointConfig.Enabled {
-			logrus.Warnf("entry point %s is not enabled", entryPointConfig.Protocol)
-			continue
-		}
 
-		forServers.Add(1)
-		apiGatewayServer, err := entrypoint.Factory(entryPointConfig, e.Handle)
-		servers = append(servers, apiGatewayServer)
-
+	for _, entryPointConfig := range c.EntryPoints {
+		_, err := entrypoint.Factory(entryPointConfig, func(request *apigateway.Request) *apigateway.Response { return nil })
 		if err != nil {
-			logrus.WithError(err).Fatal("unable to create server.")
+			logrus.WithError(err).Errorf("error in initializing server %s", entryPointConfig.Protocol)
+			return fmt.Errorf("error in initializing server %s. error=%v", entryPointConfig.Protocol, err)
 		}
-
-		go func() {
-			defer apiGatewayServer.Close()
-			err = apiGatewayServer.Start()
-			logrus.WithError(err).Info("server is shutting down.")
-			forServers.Done()
-		}()
 	}
 
-	interrupt := make(chan os.Signal, 1)
-	finished := make(chan struct{}, 1)
+	e.config = c
+	// ok
+	for _, entryPointConfig := range c.EntryPoints {
+		entryPoint, exists := e.entryPoints[entryPointConfig.Protocol]
+		if exists {
+			if entryPoint.EqualConfig(entryPointConfig) {
+				logrus.Infof("no need to reload %s entry point", entryPointConfig.Protocol)
+				continue
+			} else {
+				if entryPointConfig.Enabled != nil && *entryPointConfig.Enabled == false {
+					logrus.Infof("killing &s", entryPointConfig.Protocol)
+					entryPoint.Close()
+					delete(e.entryPoints, entryPointConfig.Protocol)
+				}
+				newEntryPoint, err := entrypoint.Factory(entryPointConfig, e.Handle)
+				if err != nil {
+					logrus.WithError(err).Errorf("unable to create %s server.", entryPointConfig.Protocol)
+					continue
+				}
+				entryPoint.Close()
+				newEntryPoint.Start()
+				e.entryPoints[entryPointConfig.Protocol] = newEntryPoint
+				go func() {
+					defer entryPoint.Close()
+					err = entryPoint.Start()
+					logrus.WithError(err).Info("server is shutting down.")
+					e.doneSignal <- struct{}{}
+				}()
 
-	signal.Notify(interrupt, os.Interrupt, os.Kill, syscall.SIGTERM)
-	go func() {
-		forServers.Wait()
-		finished <- struct{}{}
-	}()
+			}
+		} else {
+			true := true
+			if entryPointConfig.Enabled == nil {
+				entryPointConfig.Enabled = &true
+			}
+			if !*entryPointConfig.Enabled {
+				logrus.Warnf("entry point %s is not enabled", entryPointConfig.Protocol)
+				continue
+			}
 
-	select {
-	case killSignal := <-interrupt:
-		logrus.Info("got signal:", killSignal)
+			entryPoint, err := entrypoint.Factory(entryPointConfig, e.Handle)
+			if err != nil {
+				logrus.WithError(err).Errorf("unable to create %s server.", entryPointConfig.Protocol)
+				continue
+			}
 
-		for _, apiGatewayServer := range servers {
-			apiGatewayServer.Close()
+			e.entryPoints[entryPointConfig.Protocol] = entryPoint
+
+			go func() {
+				defer entryPoint.Close()
+				err = entryPoint.Start()
+				logrus.WithError(err).Info("server is shutting down.")
+				e.doneSignal <- struct{}{}
+			}()
 		}
-	case <-finished:
-		logrus.Info("server stops working")
 	}
+	return nil
 }
 
 func (e *Engine) Handle(request *apigateway.Request) (resp *apigateway.Response) {

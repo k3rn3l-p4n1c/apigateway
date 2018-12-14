@@ -22,6 +22,22 @@ type Http struct {
 	BufferPool    httputil.BufferPool
 }
 
+func (h *Http) Start() error {
+	logrus.Infof("start listening on %s", h.config.Addr)
+	h.server = &http.Server{Addr: h.config.Addr, Handler: h}
+	return h.server.ListenAndServe()
+}
+
+func (h *Http) Close() error {
+	return h.server.Close()
+}
+
+func (h *Http) EqualConfig(c *apigateway.EntryPoint) bool {
+	return c.Protocol == h.config.Protocol &&
+		c.Enabled == h.config.Enabled &&
+		c.Addr == h.config.Addr
+}
+
 func (h *Http) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	logrus.Debugf("called [%s] /%s", r.Method, r.URL.Path[1:])
 	requestRequest, err := FromHttp(r)
@@ -113,16 +129,6 @@ func (h *Http) copyBuffer(dst io.Writer, src io.ReadCloser, buf []byte) (int64, 
 
 func badRequest(w http.ResponseWriter) {
 	w.Write([]byte("bad request"))
-}
-
-func (h *Http) Start() error {
-	logrus.Infof("start listening on %s", h.config.Addr)
-	h.server = &http.Server{Addr: h.config.Addr, Handler: h}
-	return h.server.ListenAndServe()
-}
-
-func (h *Http) Close() error {
-	return h.server.Close()
 }
 
 type maxLatencyWriter struct {

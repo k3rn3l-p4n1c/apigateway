@@ -9,12 +9,13 @@ import (
 type Server interface {
 	Start() error
 	Close() error
+	EqualConfig(c *apigateway.EntryPoint) bool
 }
 
 func Factory(config *apigateway.EntryPoint, handle apigateway.HandleFunc) (Server, error) {
 	switch config.Protocol {
 	case "http":
-		if !*config.Enabled {
+		if config.Enabled != nil && !*config.Enabled {
 			return nil, fmt.Errorf("%s server is not enabled in config", config.Protocol)
 		}
 		return &Http{

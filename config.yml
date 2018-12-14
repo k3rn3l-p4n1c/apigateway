@@ -5,8 +5,8 @@ frontend:
     enabled: true
     addr: 127.0.0.1:8000
     destination: google
-    middlewares:
-      - auth
+#    middlewares:
+#      - auth
 
 entryPoints:
   - protocol: http

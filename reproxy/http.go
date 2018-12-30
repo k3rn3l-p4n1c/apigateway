@@ -47,7 +47,7 @@ func (p HttpReverseProxy) Handle(request *apigateway.Request) (*apigateway.Respo
 	transport := http.DefaultTransport
 	ctx := request.Context
 	var cancel context.CancelFunc
-	ctx, cancel = context.WithCancel(ctx)
+	ctx, cancel = context.WithTimeout(ctx, p.backend.Timeout)
 	defer cancel()
 	go func() {
 		select {

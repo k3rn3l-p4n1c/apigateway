@@ -56,20 +56,20 @@ backends:
   - name: cafe
     url: https://cafebazaar.ir/jobs/
     protocol: http
-    timeout: 5s # todo
+    timeout: 5s
     cache: 15m
 
   - name: votes
     url: https://vote.dc1.local/
     protocol: http
     discovery: kuberenetes # todo
-    timeout: 5s # todo
+    timeout: 5s
 
   - name: grpcservice
     url: tcp://grpcservice.service.datacenter.consul # todo
     discovery: consul # todo
     protocol: grpc # todo
-    timeout: 10ms # todo
+    timeout: 10ms
     middlewares:
       - name: cache
         time: 15m # todo
@@ -79,7 +79,7 @@ backends:
     url: tcp://auth.service.datacenter.consul # todo
     discovery: mesh # todo
     protocol: grpc # todo
-    timeout: 10ms # todo
+    timeout: 10ms
     cache: 15m # todo
     cacheKey: [item.id]  # todo
 

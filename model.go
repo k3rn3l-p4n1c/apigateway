@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 	"net/http"
+	"time"
 )
 
 type Config struct {
@@ -32,6 +33,7 @@ type Backend struct {
 	Name      string
 	Protocol  string
 	Discovery Discovery
+	Timeout   time.Duration
 
 	ReverseProxy ReverseProxy `mapstructure:"-"`
 }
@@ -40,7 +42,6 @@ type Discovery struct {
 	Type string
 	Url  string
 }
-
 
 type Handler interface {
 	Handle(request *Request) (*Response, error)
@@ -67,16 +68,16 @@ type Request struct {
 
 	URL string
 
-	Body               io.ReadCloser
-	HttpHeaders        http.Header
-	HttpMethod         string
+	Body        io.ReadCloser
+	HttpHeaders http.Header
+	HttpMethod  string
 }
 
 type Response struct {
-	Protocol   string
-	Body       io.ReadCloser
-	HttpStatus int
-	HttpHeaders        http.Header
+	Protocol    string
+	Body        io.ReadCloser
+	HttpStatus  int
+	HttpHeaders http.Header
 }
 
 type HandleFunc func(request *Request) *Response

@@ -2,7 +2,7 @@ package reproxy
 
 import (
 	"context"
-	"github.com/k3rn3l-p4n1c/apigateway"
+	. "github.com/k3rn3l-p4n1c/apigateway"
 	"github.com/sirupsen/logrus"
 	"net/http"
 	"strings"
@@ -29,20 +29,20 @@ var hopHeaders = []string{
 }
 
 type HttpReverseProxy struct {
-	serviceDiscovery apigateway.ServiceDiscovery
-	backend          *apigateway.Backend
+	serviceDiscovery ServiceDiscovery
+	backend          *Backend
 	FlushInterval    time.Duration
 	BufferPool       httputil.BufferPool
 }
 
-func NewHttpReverseProxy(serviceDiscovery apigateway.ServiceDiscovery, backend *apigateway.Backend) (*HttpReverseProxy, error) {
+func NewHttpReverseProxy(serviceDiscovery ServiceDiscovery, backend *Backend) (*HttpReverseProxy, error) {
 	return &HttpReverseProxy{
 		serviceDiscovery: serviceDiscovery,
 		backend:          backend,
 	}, nil
 }
 
-func (p HttpReverseProxy) Handle(request *apigateway.Request) (*apigateway.Response, error) {
+func (p HttpReverseProxy) Handle(request *Request) (*Response, error) {
 	logrus.Debug("proxying http")
 	transport := http.DefaultTransport
 	ctx := request.Context
@@ -90,14 +90,14 @@ func (p HttpReverseProxy) Handle(request *apigateway.Request) (*apigateway.Respo
 	if err != nil {
 		logrus.Infof("http: reproxy error: %v", err)
 		//request.HttpResponseWriter.WriteHeader(http.StatusBadGateway)
-		return &apigateway.Response{
+		return &Response{
 			Protocol:   "http",
 			Body:       ioutil.NopCloser(bytes.NewBufferString("bad gateway")),
 			HttpStatus: http.StatusBadGateway,
 		}, err
 	}
 
-	finalResp := &apigateway.Response{
+	finalResp := &Response{
 		Protocol:   "http",
 		HttpHeaders: make(http.Header),
 		HttpStatus: http.StatusBadGateway,
@@ -140,8 +140,9 @@ func (p HttpReverseProxy) Handle(request *apigateway.Request) (*apigateway.Respo
 
 	body, err := ioutil.ReadAll(res.Body)
 	if err != nil {
-		logrus.WithError(err).Debug("Errrrrr")
+		logrus.WithError(err).Debug("error in reading request body")
 	}
+
 	finalResp.Body = ioutil.NopCloser(bytes.NewBuffer(body))
 
 	res.Body.Close() // close now, instead of defer, to populate res.Trailer
@@ -193,13 +194,14 @@ func removeConnectionHeaders(h http.Header) {
 	}
 }
 
-func (p HttpReverseProxy) director(incomingReq *apigateway.Request, outReq *http.Request) error {
+func (p HttpReverseProxy) director(incomingReq *Request, outReq *http.Request) error {
 	scheme, host, path, err := p.serviceDiscovery.Get(incomingReq)
 	if err != nil {
 		return err
 	}
 	outReq.URL.Scheme = scheme
 	outReq.URL.Host = host
+	outReq.Host = host
 	outReq.URL.Path = singleJoiningSlash(path, outReq.URL.Path)
 	//if request. == "" || outReq.URL.RawQuery == "" {
 	//	outReq.URL.RawQuery = targetQuery + outReq.URL.RawQuery

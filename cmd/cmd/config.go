@@ -1,8 +1,6 @@
-package engine
+package cmd
 
-import (
-	"github.com/sirupsen/logrus"
-)
+import "github.com/sirupsen/logrus"
 
 var (
 	configFilePath = "./config.yml"

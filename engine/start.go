@@ -1,7 +1,7 @@
 package engine
 
 import (
-	"github.com/k3rn3l-p4n1c/apigateway"
+	. "github.com/k3rn3l-p4n1c/apigateway"
 	"github.com/k3rn3l-p4n1c/apigateway/entrypoint"
 	"github.com/k3rn3l-p4n1c/apigateway/reproxy"
 	"github.com/sirupsen/logrus"
@@ -13,40 +13,32 @@ import (
 	"bytes"
 	"io/ioutil"
 	"fmt"
-	"github.com/pkg/errors"
 	"github.com/spf13/viper"
 	"github.com/fsnotify/fsnotify"
+	"errors"
+	"time"
 )
+
+const DefaultTimeout = 10 * time.Second
 
 type Engine struct {
 	viper       *viper.Viper
-	config      *apigateway.Config
+	config      *Config
 	entryPoints map[string]entrypoint.Server
 	doneSignal  chan struct{}
 }
 
-func NewEngine() (*Engine, error) {
+func NewEngine(v *viper.Viper) (*Engine, error) {
 	engine := &Engine{
 		entryPoints: make(map[string]entrypoint.Server),
 		doneSignal:  make(chan struct{}),
-		viper: viper.New(),
+		viper: v,
 	}
 
-	engine.viper.SetConfigFile(configFilePath)
+	logrus.Debug("load config:", engine.viper.AllSettings())
+	var config = Config{}
 
-	engine.viper.OnConfigChange(engine.onConfigChange)
-	engine.viper.WatchConfig()
-
-	err := engine.viper.ReadInConfig()
-	if err != nil {
-		return nil, fmt.Errorf("can't read v file error=(%v)", err)
-	}
-	engine.viper.SetDefault("log_level", "debug")
-	setLogLevel(engine.viper.GetString("log_level"))
-	logrus.Debug(engine.viper.AllSettings())
-	var config = apigateway.Config{}
-
-	err = engine.viper.Unmarshal(&config)
+	err := engine.viper.Unmarshal(&config)
 	if err != nil {
 		return nil, err
 	}
@@ -58,9 +50,9 @@ func NewEngine() (*Engine, error) {
 	return engine, nil
 }
 
-func (e *Engine) onConfigChange(_ fsnotify.Event) {
+func (e *Engine) OnConfigChange(_ fsnotify.Event) {
 	logrus.Info("reloading config")
-	var config = apigateway.Config{}
+	var config = Config{}
 	err := e.viper.Unmarshal(&config)
 	if err != nil {
 		logrus.WithError(err).Errorf("fail to change config")
@@ -97,10 +89,23 @@ func (e *Engine) Start() {
 	}
 }
 
-func (e *Engine) loadConfig(c *apigateway.Config) error {
-	name2service := make(map[string]*apigateway.Backend)
+func (e *Engine) loadConfig(c *Config) error {
+	if len(c.EntryPoints) == 0 {
+		return errors.New("no entrypoint is set")
+	}
+	if len(c.Frontend) == 0 {
+		return errors.New("no frontend is set")
+	}
+	if len(c.Backend) == 0 {
+		return errors.New("no backend is set")
+	}
+
+	name2service := make(map[string]*Backend)
 	for _, backend := range c.Backend {
 		name2service[backend.Name] = backend
+		if backend.Timeout == 0 {
+			backend.Timeout = DefaultTimeout
+		}
 	}
 	for _, frontend := range c.Frontend {
 		frontend.Destination = name2service[frontend.DestinationName]
@@ -127,12 +132,8 @@ func (e *Engine) loadConfig(c *apigateway.Config) error {
 		}
 	}
 
-	if len(c.EntryPoints) == 0 {
-		return errors.New("no entrypoint is set")
-	}
-
 	for _, entryPointConfig := range c.EntryPoints {
-		_, err := entrypoint.Factory(entryPointConfig, func(request *apigateway.Request) *apigateway.Response { return nil })
+		_, err := entrypoint.Factory(entryPointConfig, func(request *Request) *Response { return nil })
 		if err != nil {
 			logrus.WithError(err).Errorf("error in initializing server %s", entryPointConfig.Protocol)
 			return fmt.Errorf("error in initializing server %s. error=%v", entryPointConfig.Protocol, err)
@@ -198,11 +199,11 @@ func (e *Engine) loadConfig(c *apigateway.Config) error {
 	return nil
 }
 
-func (e *Engine) Handle(request *apigateway.Request) (resp *apigateway.Response) {
+func (e *Engine) Handle(request *Request) (resp *Response) {
 	frontend, err := e.findFrontend(request)
 	if err != nil {
 		logrus.WithError(err).Info("error in finding frontend")
-		return &apigateway.Response{
+		return &Response{
 			HttpStatus: http.StatusInternalServerError,
 			Body:       ioutil.NopCloser(bytes.NewBufferString("error in finding frontend")),
 		}
@@ -210,7 +211,7 @@ func (e *Engine) Handle(request *apigateway.Request) (resp *apigateway.Response)
 
 	if frontend.Destination == nil {
 		if err != nil {
-			return &apigateway.Response{
+			return &Response{
 				HttpStatus: http.StatusInternalServerError,
 				Body:       ioutil.NopCloser(bytes.NewBufferString("backend is nil")),
 			}
@@ -221,14 +222,14 @@ func (e *Engine) Handle(request *apigateway.Request) (resp *apigateway.Response)
 		resp, err = frontend.Middlewares[0].Handle(request)
 		if err != nil {
 			logrus.WithError(err).Error("error in middleware")
-			return &apigateway.Response{
+			return &Response{
 				HttpStatus: http.StatusInternalServerError,
 				Body:       ioutil.NopCloser(bytes.NewBufferString("apigateway internal error")),
 			}
 		}
 		if request.Context.Err() != nil {
 			logrus.WithError(request.Context.Err()).Debug("error in context when processing request")
-			return &apigateway.Response{
+			return &Response{
 				HttpStatus: http.StatusGatewayTimeout,
 				Body:       ioutil.NopCloser(bytes.NewBufferString("timeout exceeded")),
 			}
@@ -238,7 +239,7 @@ func (e *Engine) Handle(request *apigateway.Request) (resp *apigateway.Response)
 		logrus.Debug("no middleware")
 		if err != nil {
 			logrus.WithError(err).Error("error in reverse proxy")
-			return &apigateway.Response{
+			return &Response{
 				HttpStatus: http.StatusInternalServerError,
 				Body:       ioutil.NopCloser(bytes.NewBufferString("apigateway internal error")),
 			}

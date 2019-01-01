@@ -1,7 +1,7 @@
 package auth
 
 import (
-	"github.com/k3rn3l-p4n1c/apigateway"
+	. "github.com/k3rn3l-p4n1c/apigateway"
 	"bytes"
 	"net/http"
 	"io/ioutil"
@@ -9,21 +9,21 @@ import (
 )
 
 type Auth struct {
-	nextHandler apigateway.Handler
+	nextHandler Handler
 }
 
-func (a Auth) Handle(request *apigateway.Request) (*apigateway.Response, error) {
+func (a Auth) Handle(request *Request) (*Response, error) {
 	authHeader, ok := request.HttpHeaders["authorization"]
 	if !ok || len(authHeader) < 1 {
 		writer := ioutil.NopCloser(bytes.NewBufferString("403 forbidden"))
-		return &apigateway.Response{
+		return &Response{
 			HttpStatus: http.StatusForbidden,
 			Body:       writer,
 		}, nil
 	}
 	if request.HttpHeaders["authorization"][0] == "123123" {
 		writer := ioutil.NopCloser(bytes.NewBufferString("403 forbidden"))
-		return &apigateway.Response{
+		return &Response{
 			HttpStatus: http.StatusForbidden,
 			Body:       writer,
 		}, nil
@@ -33,6 +33,6 @@ func (a Auth) Handle(request *apigateway.Request) (*apigateway.Response, error) 
 	return resp, nil
 }
 
-func (a Auth) SetNext(handler apigateway.Handler) {
+func (a Auth) SetNext(handler Handler) {
 	a.nextHandler = handler
 }

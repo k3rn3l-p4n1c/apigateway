@@ -2,7 +2,7 @@ package entrypoint
 
 import (
 	"context"
-	"github.com/k3rn3l-p4n1c/apigateway"
+	. "github.com/k3rn3l-p4n1c/apigateway"
 	"github.com/sirupsen/logrus"
 	"net"
 	"net/http"
@@ -13,10 +13,10 @@ import (
 )
 
 type Http struct {
-	config  *apigateway.EntryPoint
+	config  *EntryPoint
 	server  *http.Server
 	proxies map[string]*httputil.ReverseProxy
-	handle  apigateway.HandleFunc
+	handle  HandleFunc
 
 	FlushInterval time.Duration
 	BufferPool    httputil.BufferPool
@@ -32,7 +32,7 @@ func (h *Http) Close() error {
 	return h.server.Close()
 }
 
-func (h *Http) EqualConfig(c *apigateway.EntryPoint) bool {
+func (h *Http) EqualConfig(c *EntryPoint) bool {
 	return c.Protocol == h.config.Protocol &&
 		c.Enabled == h.config.Enabled &&
 		c.Addr == h.config.Addr
@@ -50,9 +50,9 @@ func (h *Http) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	h.WriteToHttp(w, response)
 }
 
-func FromHttp(r *http.Request) (*apigateway.Request, error) {
+func FromHttp(r *http.Request) (*Request, error) {
 	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
-	obj := apigateway.Request{
+	obj := Request{
 		Protocol:    "http",
 		Context:     ctx,
 		CtxCancel:   cancel,
@@ -68,7 +68,7 @@ func FromHttp(r *http.Request) (*apigateway.Request, error) {
 	return &obj, nil
 }
 
-func (h *Http) WriteToHttp(w http.ResponseWriter, response *apigateway.Response) {
+func (h *Http) WriteToHttp(w http.ResponseWriter, response *Response) {
 	copyHeader(w.Header(), response.HttpHeaders)
 	h.copyResponse(w, response.Body)
 	w.WriteHeader(response.HttpStatus)

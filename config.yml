@@ -3,7 +3,7 @@ log_level: debug
 frontend:
   - protocol: http
     enabled: true
-    addr: 127.0.0.1:8000
+    host: 127.0.0.1:8000
     destination: google
 #    middlewares:
 #      - auth

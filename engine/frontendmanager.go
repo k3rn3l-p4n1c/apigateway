@@ -2,12 +2,12 @@ package engine
 
 import (
 	"errors"
-	"github.com/k3rn3l-p4n1c/apigateway"
+	. "github.com/k3rn3l-p4n1c/apigateway"
 	"github.com/sirupsen/logrus"
 	"net/url"
 )
 
-func (e Engine) findFrontend(r *apigateway.Request) (*apigateway.Frontend, error) {
+func (e Engine) findFrontend(r *Request) (*Frontend, error) {
 	for _, frontendConfig := range e.config.Frontend {
 		if isMatch(frontendConfig, r) {
 			return frontendConfig, nil
@@ -16,7 +16,7 @@ func (e Engine) findFrontend(r *apigateway.Request) (*apigateway.Frontend, error
 	return nil, errors.New("frontend does not match request")
 }
 
-func isMatch(frontend *apigateway.Frontend, r *apigateway.Request) bool {
+func isMatch(frontend *Frontend, r *Request) bool {
 	if r.Protocol != frontend.Protocol {
 		return false
 	}
@@ -27,8 +27,8 @@ func isMatch(frontend *apigateway.Frontend, r *apigateway.Request) bool {
 			logrus.WithError(err).Debug("findFrontend error in parsing url")
 			return false
 		}
-		println(frontend.Addr, rUrl.Host, frontend.Addr == rUrl.Host)
-		return frontend.Addr == rUrl.Host
+
+		return frontend.Host == rUrl.Host
 	default:
 		logrus.WithField("protocol", r.Protocol).Debug("findFrontend invalid protocol error")
 	}

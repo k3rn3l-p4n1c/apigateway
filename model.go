@@ -21,7 +21,7 @@ type EntryPoint struct {
 
 type Frontend struct {
 	Protocol        string
-	Addr            string
+	Host            string
 	DestinationName string   `mapstructure:"destination"`
 	MiddlewareNames []string `mapstructure:"middlewares"`
 

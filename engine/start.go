@@ -133,7 +133,7 @@ func (e *Engine) loadConfig(c *Config) error {
 	}
 
 	for _, entryPointConfig := range c.EntryPoints {
-		_, err := entrypoint.Factory(entryPointConfig, func(request *Request) *Response { return nil })
+		_, err := entrypoint.New(entryPointConfig, func(request *Request) *Response { return nil })
 		if err != nil {
 			logrus.WithError(err).Errorf("error in initializing server %s", entryPointConfig.Protocol)
 			return fmt.Errorf("error in initializing server %s. error=%v", entryPointConfig.Protocol, err)
@@ -154,7 +154,7 @@ func (e *Engine) loadConfig(c *Config) error {
 					entryPoint.Close()
 					delete(e.entryPoints, entryPointConfig.Protocol)
 				}
-				newEntryPoint, err := entrypoint.Factory(entryPointConfig, e.Handle)
+				newEntryPoint, err := entrypoint.New(entryPointConfig, e.Handle)
 				if err != nil {
 					logrus.WithError(err).Errorf("unable to create %s server.", entryPointConfig.Protocol)
 					continue
@@ -171,16 +171,15 @@ func (e *Engine) loadConfig(c *Config) error {
 
 			}
 		} else {
-			true := true
 			if entryPointConfig.Enabled == nil {
-				entryPointConfig.Enabled = &true
+				entryPointConfig.Enabled = &True
 			}
 			if !*entryPointConfig.Enabled {
 				logrus.Warnf("entry point %s is not enabled", entryPointConfig.Protocol)
 				continue
 			}
 
-			entryPoint, err := entrypoint.Factory(entryPointConfig, e.Handle)
+			entryPoint, err := entrypoint.New(entryPointConfig, e.Handle)
 			if err != nil {
 				logrus.WithError(err).Errorf("unable to create %s server.", entryPointConfig.Protocol)
 				continue

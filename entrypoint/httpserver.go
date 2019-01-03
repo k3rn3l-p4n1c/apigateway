@@ -15,7 +15,6 @@ import (
 type Http struct {
 	config  *EntryPoint
 	server  *http.Server
-	proxies map[string]*httputil.ReverseProxy
 	handle  HandleFunc
 
 	FlushInterval time.Duration

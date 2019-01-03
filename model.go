@@ -7,6 +7,8 @@ import (
 	"time"
 )
 
+var True = true
+
 type Config struct {
 	EntryPoints []*EntryPoint
 	Frontend    []*Frontend

@@ -3,7 +3,6 @@ package entrypoint
 import (
 	"fmt"
 	. "github.com/k3rn3l-p4n1c/apigateway"
-	"net/http/httputil"
 )
 
 type Server interface {
@@ -12,7 +11,7 @@ type Server interface {
 	EqualConfig(c *EntryPoint) bool
 }
 
-func Factory(config *EntryPoint, handle HandleFunc) (Server, error) {
+func New(config *EntryPoint, handle HandleFunc) (Server, error) {
 	switch config.Protocol {
 	case "http":
 		if config.Enabled != nil && !*config.Enabled {
@@ -21,7 +20,6 @@ func Factory(config *EntryPoint, handle HandleFunc) (Server, error) {
 		return &Http{
 			config:  config,
 			handle:  handle,
-			proxies: make(map[string]*httputil.ReverseProxy),
 		}, nil
 
 	default:

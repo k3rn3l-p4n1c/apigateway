@@ -60,7 +60,6 @@ func (p HttpReverseProxy) Handle(request *Request) (*Response, error) {
 	outReq, _ := http.NewRequest(request.HttpMethod, request.URL, request.Body)
 	outReq = outReq.WithContext(ctx)
 	outReq.Header = cloneHeader(request.HttpHeaders)
-
 	err := p.director(request, outReq)
 	if err != nil {
 		logrus.WithError(err).Error("unable to direct request")

@@ -21,9 +21,16 @@ type EntryPoint struct {
 	Addr     string
 }
 
+type MatchCondition struct {
+	Host   string
+	Query  map[string]string
+	Header map[string]string
+	Method string
+}
 type Frontend struct {
+	Id              string   `mapstructure:"-"`
 	Protocol        string
-	Host            string
+	Match           []MatchCondition
 	DestinationName string   `mapstructure:"destination"`
 	MiddlewareNames []string `mapstructure:"middlewares"`
 

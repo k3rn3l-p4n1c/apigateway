@@ -66,6 +66,10 @@ func (e *Engine) OnConfigChange(_ fsnotify.Event) {
 }
 
 func (e *Engine) Start() {
+	if e == nil {
+		panic("trying to start a nil engine")
+	}
+
 	interrupt := make(chan os.Signal, 1)
 	finished := make(chan struct{}, 1)
 

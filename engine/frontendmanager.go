@@ -27,8 +27,48 @@ func isMatch(frontend *Frontend, r *Request) bool {
 			logrus.WithError(err).Debug("findFrontend error in parsing url")
 			return false
 		}
+		for _, condition := range frontend.Match {
+			if condition.Host != "" {
+				if condition.Host != rUrl.Host{
+					continue
+				}
+			}
+			if len(condition.Header) > 0 {
+				match := true
+				for k, v := range condition.Header {
+					if r.HttpHeaders.Get(k) != v {
+						match = false
+						break
+					}
+				}
+				if !match {
+					continue
+				}
+			}
+			if condition.Method != "" {
+				if condition.Method != r.HttpMethod {
+					continue
+				}
+			}
+			if len(condition.Query) > 0 {
+				match := true
+				for k, v := range condition.Query {
+					if rUrl.Query().Get(k) != v {
+						match = false
+						break
+					}
+				}
+				if !match {
+					continue
+				}
+			}
 
-		return frontend.Host == rUrl.Host
+			// is matched with one condition at least
+			return true
+		}
+
+		// matched with no condition
+		return false
 	default:
 		logrus.WithField("protocol", r.Protocol).Debug("findFrontend invalid protocol error")
 	}

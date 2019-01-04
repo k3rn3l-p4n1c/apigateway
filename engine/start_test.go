@@ -25,7 +25,8 @@ func TestSimpleHttpToHttpRequest(t *testing.T) {
 frontend:
   - protocol: http
     enabled: true
-    host: 127.0.0.1:9999
+    match:
+        - host: 127.0.0.1:9999
     destination: example
 
 entryPoints:
@@ -46,24 +47,25 @@ backend:
 	v.Set("log_level", "debug")
 
 	e, err := NewEngine(v)
-	assert.NoError(t, err, "unable to instantiate Engine")
+	if assert.NoError(t, err, "unable to instantiate Engine") {
 
-	go e.Start()
-	time.Sleep(1 * time.Second)
+		go e.Start()
+		time.Sleep(1 * time.Second)
 
-	resp1, err := http.Get("http://127.0.0.1:9999")
-	assert.NoError(t, err, "unable to get data from apigateway")
-	assert.Equal(t, 200, resp1.StatusCode, "apigateway status code is not ok")
+		resp1, err := http.Get("http://127.0.0.1:9999")
+		assert.NoError(t, err, "unable to get data from apigateway")
+		assert.Equal(t, 200, resp1.StatusCode, "apigateway status code is not ok")
 
-	resp2, err := http.Get("http://example.com")
-	assert.NoError(t, err, "unable to get data from example.com")
-	assert.Equal(t, 200, resp2.StatusCode, "example.com status code is not ok")
+		resp2, err := http.Get("http://example.com")
+		assert.NoError(t, err, "unable to get data from example.com")
+		assert.Equal(t, 200, resp2.StatusCode, "example.com status code is not ok")
 
-	body1, err := ioutil.ReadAll(resp1.Body)
-	assert.NoError(t, err, "unable to read body from apigateway")
+		body1, err := ioutil.ReadAll(resp1.Body)
+		assert.NoError(t, err, "unable to read body from apigateway")
 
-	body2, err := ioutil.ReadAll(resp2.Body)
-	assert.NoError(t, err, "unable to read body from example.com")
+		body2, err := ioutil.ReadAll(resp2.Body)
+		assert.NoError(t, err, "unable to read body from example.com")
 
-	assert.Equal(t, string(body1), string(body2), "apigateway response body is not equal example.com")
+		assert.Equal(t, string(body1), string(body2), "apigateway response body is not equal example.com")
+	}
 }

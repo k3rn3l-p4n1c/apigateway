@@ -39,10 +39,14 @@ type Frontend struct {
 }
 
 type Backend struct {
-	Name      string
-	Protocol  string
-	Discovery Discovery
-	Timeout   time.Duration
+	Name        string
+	Protocol    string
+	Discovery   Discovery
+	Timeout     time.Duration
+	Path        string
+	Scheme      string
+	ForwardHost bool
+	Host        string
 
 	ReverseProxy ReverseProxy `mapstructure:"-"`
 }
@@ -57,7 +61,7 @@ type Handler interface {
 }
 
 type ServiceDiscovery interface {
-	Get(request *Request) (scheme string, host string, path string, err error)
+	Get(addr string) (ip string, err error)
 }
 
 type Middleware interface {

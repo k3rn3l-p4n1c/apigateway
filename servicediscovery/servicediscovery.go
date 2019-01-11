@@ -8,9 +8,19 @@ import (
 func New(config Discovery) (ServiceDiscovery, error) {
 	switch config.Type {
 	case "static":
-		return &StaticServiceDiscovery{
-			config: config,
-		}, nil
+		d := &StaticServiceDiscovery{}
+		err := d.setConfig(config)
+		if err != nil {
+			return nil, err
+		}
+		return d, nil
+	case "dns":
+		d := &DNSServiceDiscovery{}
+		err := d.setConfig(config)
+		if err != nil {
+			return nil, err
+		}
+		return d, nil
 	default:
 		return nil, fmt.Errorf("discovery type %s is not supported", config.Type)
 

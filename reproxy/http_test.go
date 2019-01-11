@@ -17,9 +17,12 @@ func TestHttpReverseProxy(t *testing.T) {
 		Name:     "reqres",
 		Protocol: "http",
 		Discovery: Discovery{
-			Type: "static",
-			Url:  "https://reqres.in/api",
+			Type: "dns",
+			Url:"reqres.in",
 		},
+		Host: "reqres.in",
+		Path: "/api",
+		Scheme: "https",
 		Timeout: 5 * time.Second,
 	}
 	r, err := New(backend)

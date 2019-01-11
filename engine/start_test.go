@@ -36,8 +36,8 @@ entryPoints:
 backend:
   - name: example
     discovery:
-      type: static
-      url: http://example.com
+      type: dns
+    host: example.com
     protocol: http
 `
 	v.SetConfigType("yml")

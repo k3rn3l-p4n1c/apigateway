@@ -110,6 +110,9 @@ func (e *Engine) loadConfig(c *Config) error {
 		if backend.Timeout == 0 {
 			backend.Timeout = DefaultTimeout
 		}
+		if backend.Scheme == "" {
+			backend.Scheme = backend.Protocol
+		}
 	}
 	for _, frontend := range c.Frontend {
 		frontend.Destination = name2service[frontend.DestinationName]
@@ -127,6 +130,9 @@ func (e *Engine) loadConfig(c *Config) error {
 			frontend.Middlewares = append(frontend.Middlewares, middleware)
 		}
 		var err error
+		if frontend.Destination.Discovery.Type == "dns" {
+			frontend.Destination.Discovery.Url = frontend.Destination.Host
+		}
 		frontend.Destination.ReverseProxy, err = reproxy.New(frontend.Destination)
 		if err != nil {
 			return fmt.Errorf("fail to initialize reverse proxy for backend error=%v", err)

@@ -12,6 +12,8 @@ import (
 	"net/http/httputil"
 	"io"
 	"sync"
+	"net/url"
+	"net"
 )
 
 // Hop-by-hop headers. These are removed when sent to the backend.
@@ -28,23 +30,53 @@ var hopHeaders = []string{
 	"Upgrade",
 }
 
+var defaultDialer = &net.Dialer{
+	Timeout:   30 * time.Second,
+	KeepAlive: 30 * time.Second,
+	DualStack: true,
+}
+
+var getDialFunc = func(serviceDiscovery ServiceDiscovery) func(ctx context.Context, network, addr string) (net.Conn, error) {
+	return func(ctx context.Context, network, addr string) (net.Conn, error) {
+		colon := strings.IndexByte(addr, ':')
+		port := addr[colon+1:]
+		ip, err := serviceDiscovery.Get(addr)
+		if err != nil {
+			return nil, err
+		}
+
+		return defaultDialer.DialContext(ctx, network, ip+":"+port)
+	}
+}
+
 type HttpReverseProxy struct {
 	serviceDiscovery ServiceDiscovery
 	backend          *Backend
 	FlushInterval    time.Duration
 	BufferPool       httputil.BufferPool
+	transport        http.RoundTripper
 }
 
 func NewHttpReverseProxy(serviceDiscovery ServiceDiscovery, backend *Backend) (*HttpReverseProxy, error) {
+
+	transport := &http.Transport{
+		Proxy:                 http.ProxyFromEnvironment,
+		MaxIdleConns:          100,
+		IdleConnTimeout:       90 * time.Second,
+		TLSHandshakeTimeout:   10 * time.Second,
+		ExpectContinueTimeout: 1 * time.Second,
+		DialContext:           getDialFunc(serviceDiscovery),
+	}
 	return &HttpReverseProxy{
 		serviceDiscovery: serviceDiscovery,
 		backend:          backend,
+		transport:        transport,
 	}, nil
 }
 
 func (p HttpReverseProxy) Handle(request *Request) (*Response, error) {
 	logrus.Debug("proxying http")
-	transport := http.DefaultTransport
+
 	ctx := request.Context
 	var cancel context.CancelFunc
 	ctx, cancel = context.WithTimeout(ctx, p.backend.Timeout)
@@ -85,7 +117,7 @@ func (p HttpReverseProxy) Handle(request *Request) (*Response, error) {
 	}
 	outReq.Header.Set("X-Forwarded-For", request.ClientIP)
 
-	res, err := transport.RoundTrip(outReq)
+	res, err := p.transport.RoundTrip(outReq)
 	if err != nil {
 		logrus.Infof("http: reproxy error: %v", err)
 		//request.HttpResponseWriter.WriteHeader(http.StatusBadGateway)
@@ -97,9 +129,9 @@ func (p HttpReverseProxy) Handle(request *Request) (*Response, error) {
 	}
 
 	finalResp := &Response{
-		Protocol:   "http",
+		Protocol:    "http",
 		HttpHeaders: make(http.Header),
-		HttpStatus: http.StatusBadGateway,
+		HttpStatus:  http.StatusBadGateway,
 	}
 
 	removeConnectionHeaders(res.Header)
@@ -194,14 +226,20 @@ func removeConnectionHeaders(h http.Header) {
 }
 
 func (p HttpReverseProxy) director(incomingReq *Request, outReq *http.Request) error {
-	scheme, host, path, err := p.serviceDiscovery.Get(incomingReq)
+	incomingUrl, err := url.Parse(incomingReq.URL)
 	if err != nil {
 		return err
 	}
-	outReq.URL.Scheme = scheme
-	outReq.URL.Host = host
-	outReq.Host = host
-	outReq.URL.Path = singleJoiningSlash(path, outReq.URL.Path)
+	outReq.URL.Scheme = p.backend.Scheme
+
+	if p.backend.ForwardHost {
+		outReq.URL.Host = incomingUrl.Host
+		outReq.Host = incomingUrl.Host
+	} else {
+		outReq.URL.Host = p.backend.Host
+		outReq.Host = p.backend.Host
+	}
+	outReq.URL.Path = singleJoiningSlash(p.backend.Path, outReq.URL.Path)
 	//if request. == "" || outReq.URL.RawQuery == "" {
 	//	outReq.URL.RawQuery = targetQuery + outReq.URL.RawQuery
 	//} else {

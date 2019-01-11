@@ -16,6 +16,7 @@ entryPoints:
 backend:
   - name: google
     discovery:
-      type: static
-      url: https://cafebazaar.ir/jobs/
+      type: dns
+    host: cafebazaar.ir
     protocol: http
+    path: /jobs/
